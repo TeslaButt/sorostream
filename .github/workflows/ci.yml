@@ -69,13 +69,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Node.js with built-in npm cache.
-      #    Cache key is derived from package-lock.json for reproducibility.
+      # 2. Install Node.js.
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
 
       # 3. Install workspace dependencies.
       - name: Install npm dependencies
