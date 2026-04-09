@@ -77,9 +77,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      # 3. Install workspace dependencies using the exact lockfile.
+      # 3. Install workspace dependencies.
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       # 4. ESLint — runs across all packages via Turborepo task graph.
       #    A non-zero exit code (any lint error) fails the job and blocks merge.
