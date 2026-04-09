@@ -75,9 +75,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # 3. Install workspace dependencies.
-      - name: Install npm dependencies
-        run: npm install --legacy-peer-deps
+      # 3. Upgrade npm to the latest version and install dependencies.
+      - name: Upgrade npm and install dependencies
+        run: |
+          npm install -g npm@latest
+          npm install --legacy-peer-deps --no-fund --no-audit
 
       # 4. ESLint — runs across all packages via Turborepo task graph.
       #    A non-zero exit code (any lint error) fails the job and blocks merge.
