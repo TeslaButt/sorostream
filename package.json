@@ -1,9 +1,10 @@
 {
   "name": "sorostream",
   "version": "0.0.0",
+  "packageManager": "npm@10.8.2",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/frontend"
   ],
   "scripts": {
     "build": "turbo run build",
