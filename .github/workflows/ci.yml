@@ -1,0 +1,178 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI — SoroStream Continuous Integration Pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Validates the entire SoroStream monorepo on every push to `main` and on
+# every Pull Request targeting `main`.
+#
+# Pipeline structure (jobs run in parallel):
+#
+#   ┌──────────────────────────────────────────────────────────┐
+#   │  JOB 1: node                                             │
+#   │   • Sets up Node.js 20                                   │
+#   │   • Installs all npm workspace dependencies (npm ci)     │
+#   │   • Runs ESLint across the monorepo via Turborepo        │
+#   │   • Type-checks packages/frontend (tsc --noEmit)         │
+#   │   • Builds packages/frontend (next build)                │
+#   └──────────────────────────────────────────────────────────┘
+#
+#   ┌──────────────────────────────────────────────────────────┐
+#   │  JOB 2: contracts                                        │
+#   │   • Sets up Rust (pinned toolchain from rust-toolchain)  │
+#   │   • Adds the wasm32-unknown-unknown compilation target   │
+#   │   • Caches Cargo registry for fast incremental builds    │
+#   │   • Installs stellar-cli for `contract build`            │
+#   │   • cargo fmt --check  (formatting gate)                 │
+#   │   • cargo clippy       (idiomatic Rust lint)             │
+#   │   • cargo test         (unit tests with Soroban harness) │
+#   │   • stellar contract build --profile release (WASM artefact) │
+#   └──────────────────────────────────────────────────────────┘
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+# ── Trigger Conditions ────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main           # Every direct push (merges, hotfixes)
+  pull_request:
+    branches:
+      - main           # Every PR targeting main (code-review gate)
+
+# ── Concurrency Guard ─────────────────────────────────────────────────────────
+# Cancel in-progress runs for the same branch/PR to save CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Pinned Global Versions ────────────────────────────────────────────────────
+env:
+  NODE_VERSION: "20"
+  # Soroban SDK v21 requires Rust ≥ 1.88.0 (darling, serde_with, time deps).
+  RUST_VERSION: "1.88.0"
+  # stellar-cli version must match the soroban-sdk version in Cargo.toml.
+  # Bump both together on SDK upgrades.
+  STELLAR_CLI_VERSION: "21.0.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Job 1: TypeScript / Next.js Frontend ─────────────────────────────────
+  node:
+    name: "Frontend — Lint, Type-check & Build"
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository at the triggering commit.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install Node.js with built-in npm cache.
+      #    Cache key is derived from package-lock.json for reproducibility.
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # 3. Install workspace dependencies using the exact lockfile.
+      - name: Install npm dependencies
+        run: npm ci
+
+      # 4. ESLint — runs across all packages via Turborepo task graph.
+      #    A non-zero exit code (any lint error) fails the job and blocks merge.
+      - name: Lint (Turborepo)
+        run: npx turbo run lint
+
+      # 5. Next.js production build.
+      #    NEXT_PUBLIC_* vars are populated with safe CI placeholders so the
+      #    build succeeds without a live deployed contract.
+      - name: Build frontend (Turborepo)
+        run: npx turbo run build --log-order=grouped
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_CONTRACT_ID: "PLACEHOLDER_FOR_CI_BUILD"
+          NEXT_PUBLIC_RPC_URL: "https://soroban-testnet.stellar.org"
+          NEXT_PUBLIC_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+
+  # ── Job 2: Soroban Smart Contracts (Rust) ────────────────────────────────
+  contracts:
+    name: "Contracts — Fmt, Clippy, Test & Build (WASM)"
+    runs-on: ubuntu-latest
+
+    # All steps default to the contracts subdirectory.
+    defaults:
+      run:
+        working-directory: packages/contracts
+
+    steps:
+      # 1. Checkout.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install the pinned Rust toolchain.
+      #    - wasm32-unknown-unknown: required WASM target for Soroban
+      #    - clippy + rustfmt: linting and formatting tools
+      - name: Setup Rust toolchain ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      # 3. Cache Cargo registry, git sources, and build artefacts.
+      #    The cache key is tied to Cargo.lock so a full re-download only
+      #    happens when dependencies change.
+      - name: Cache Cargo registry and build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/contracts/target
+          key: ${{ runner.os }}-cargo-sorostream-${{ hashFiles('packages/contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-sorostream-
+            ${{ runner.os }}-cargo-
+
+      # 4. Install the Stellar CLI.
+      #    --locked: use the exact dependency tree in the CLI lockfile.
+      #    --features opt: enables wasm-opt for WASM size optimisation.
+      - name: Install Stellar CLI v${{ env.STELLAR_CLI_VERSION }}
+        run: |
+          cargo install --locked stellar-cli \
+            --version ${{ env.STELLAR_CLI_VERSION }} \
+            --features opt
+
+      # 5. Formatting gate — ensures all Rust source has been `cargo fmt`'d.
+      #    PRs with unformatted code are rejected here before any tests run.
+      - name: Check Rust formatting (cargo fmt)
+        run: cargo fmt --check
+
+      # 6. Clippy — idiomatic Rust linter targeting the WASM build target.
+      #    -D warnings: every warning is promoted to a hard error (zero-warning policy).
+      - name: Run Clippy linter (wasm32)
+        run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+
+      # 7. Unit tests — runs tests natively (not in WASM) for fast feedback.
+      #    RUSTFLAGS=-D warnings maintains the zero-warning policy during tests.
+      - name: Run contract unit tests (cargo test)
+        run: cargo test
+        env:
+          RUSTFLAGS: "-D warnings"
+
+      # 8. Release WASM build — the final artefact deployable via `stellar contract deploy`.
+      #    Building in CI catches release-only issues (linker errors, wasm-opt overflows).
+      - name: Build release WASM (stellar contract build)
+        run: stellar contract build --profile release
+
+      # 9. Upload the compiled WASM as a CI artefact for auditability.
+      #    Reviewers and grantors can download and inspect the binary.
+      - name: Upload WASM artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sorostream-wasm-${{ github.sha }}
+          path: packages/contracts/target/wasm32-unknown-unknown/release/*.wasm
+          retention-days: 30

@@ -1,0 +1,43 @@
+[package]
+name        = "sorostream-contracts"
+version     = "0.1.0"
+edition     = "2021"
+description = "SoroStream — real-time token streaming & vesting protocol on Stellar Soroban."
+license     = "MIT"
+authors     = ["SoroStream Contributors"]
+repository  = "https://github.com/YOUR_ORG/sorostream"
+
+# ── Build Target ──────────────────────────────────────────────────────────────
+# cdylib is required by Soroban: the contract is compiled to a WASM shared lib.
+[lib]
+crate-type = ["cdylib"]
+name       = "sorostream"
+
+# ── Runtime Dependencies ──────────────────────────────────────────────────────
+[dependencies]
+# Official Soroban SDK — Protocol 21 compatible.
+soroban-sdk = { version = "21.0.0" }
+
+# ── Dev / Test Dependencies ───────────────────────────────────────────────────
+# The "testutils" feature unlocks Address::generate(), mock_all_auths(), Ledger
+# test utilities, and the register_stellar_asset_contract_v2() helper.
+[dev-dependencies]
+soroban-sdk = { version = "21.0.0", features = ["testutils"] }
+
+# ── Release Profile ───────────────────────────────────────────────────────────
+# Minimise WASM binary size for on-chain deployment.
+[profile.release]
+opt-level        = "z"      # Optimise for binary size
+overflow-checks  = true     # Keep checked arithmetic (critical for financial logic)
+debug            = 0
+strip            = "symbols"
+debug-assertions = false
+panic            = "abort"  # Minimal panic handler for WASM
+codegen-units    = 1        # Single codegen unit for maximum LTO benefit
+lto              = true
+
+# ── Release-with-logs Profile ─────────────────────────────────────────────────
+# Use during local debugging: identical to release but with assertions on.
+[profile.release-with-logs]
+inherits         = "release"
+debug-assertions = true

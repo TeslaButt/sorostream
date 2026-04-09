@@ -1,0 +1,27 @@
+# SoroStream — Monorepo .gitignore
+
+# ── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.next/
+out/
+.turbo/
+
+# ── Environment ─────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Rust / Cargo ────────────────────────────────────────────────────────────
+target/
+Cargo.lock   # Cargo.lock IS committed for contracts (binary artifacts)
+# Uncomment the line above if you want to exclude it (not recommended)
+
+# ── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor ──────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp

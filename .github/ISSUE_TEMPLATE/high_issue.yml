@@ -1,0 +1,175 @@
+name: "🔴 High — Core Security, Indexer & Protocol Architecture"
+description: |
+  Use this template for work that touches security-critical contract logic,
+  the event indexer, protocol-level architecture, or upgrade mechanisms.
+
+  DRIPS COMPLEXITY TIER: High
+  Suitable for: Experienced Soroban/Rust developers. Security review required.
+  Reward range: $800 – $2,500 (see CONTRIBUTING.md for reward policy).
+
+labels:
+  - "complexity: high"
+  - "security"
+  - "needs-design-review"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🔴 High-Complexity Issue — SoroStream
+
+        > ⚠️ **Security Notice**: Changes in this category directly affect
+        > on-chain token custody and authorization logic.  All PRs addressing
+        > a High issue **require** a security design review by a core maintainer
+        > *before* implementation begins.  Please comment on this issue and wait
+        > for acknowledgement before writing code.
+
+        High issues typically involve:
+        - Core `claim_stream` / `cancel_stream` financial logic
+        - Authorization model changes (`require_auth` / `invoke_contract`)
+        - Non-linear vesting curve implementations (new maths, overflow risks)
+        - On-chain upgrades (`upgrade()` / `set_data()`)
+        - Off-chain event indexer design (reliability, re-org handling)
+        - Security audits of existing code
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary Area of Impact
+      multiple: true
+      options:
+        - "Contract — token custody / transfer logic"
+        - "Contract — authorization & access control"
+        - "Contract — vesting curve mathematics"
+        - "Contract — storage / ledger expiry handling"
+        - "Contract — upgrade / migration mechanism"
+        - "Indexer — event ingestion & storage"
+        - "Indexer — re-org handling & consistency"
+        - "Protocol — fee model / tokenomics"
+        - "Security audit — existing code"
+        - "Other (describe below)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement & Security Context
+      description: |
+        Describe the issue in full technical detail. Include:
+        - The exact attack vector, edge case, or architectural gap
+        - Which contract functions / state are affected
+        - What a malicious actor could do if this is NOT addressed
+        - Any relevant SDF forum posts, audit reports, or academic references
+      placeholder: |
+        Example: "The `cancel_stream` function is currently a stub that panics.
+        Without a proper implementation, a sender has no way to recover tokens
+        from a stream where the recipient becomes unreachable.
+
+        More critically, if we implement cancel naively (transfer then update state),
+        a re-entrant call via a malicious SAC could double-withdraw from the contract.
+
+        Required: implement cancel with strict CEI (Checks-Effects-Interactions):
+        1. Compute vested portion for recipient.
+        2. Compute unvested refund for sender.
+        3. Write new state (is_cancelled = true, claimed_amount updated) BEFORE transfers.
+        4. Perform both token transfers.
+        5. Assert invariant: total_amount == claimed_amount + refund (add as debug assertion)."
+    validations:
+      required: true
+
+  - type: textarea
+    id: threat_model
+    attributes:
+      label: Threat Model / Attack Scenarios
+      description: |
+        List the specific attack scenarios or invariant violations this issue
+        addresses or could introduce.  This section is required for all security
+        issues and strongly encouraged for all High issues.
+      placeholder: |
+        1. Re-entrancy via malicious SAC: attacker deploys a SAC whose `transfer`
+           callback calls back into `cancel_stream` before state is updated.
+        2. Integer overflow in vesting math when total_amount is close to i128::MAX.
+        3. Sender cancels stream milliseconds before end_time; recipient receives 0
+           instead of nearly-full vested amount (off-by-one in timestamp comparison).
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposed_approach
+    attributes:
+      label: Proposed Approach & Design
+      description: |
+        Describe your technical approach at a design level — not full code,
+        but enough for a maintainer to validate the direction before you invest
+        significant implementation time.  Include:
+        - Data structure changes (new `Stream` fields, new `DataKey` variants)
+        - Control flow (which functions call which, order of operations)
+        - Testing strategy (new test cases covering each attack scenario above)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Precise, checkable conditions.  For security issues, include invariant assertions.
+      placeholder: |
+        Contract:
+        - [ ] `cancel_stream` fully implemented with CEI pattern.
+        - [ ] Invariant: `stream.claimed_amount + refund == stream.total_amount` on cancel.
+        - [ ] `cancel_stream` emits `(stream, cancelled)` event.
+        - [ ] `is_cancelled` flag prevents subsequent `claim_stream` calls.
+
+        Tests (all in `#[cfg(test)]`):
+        - [ ] `test_cancel_at_50pct` — verifies 50/50 split at midpoint.
+        - [ ] `test_cancel_before_start` — full refund to sender, 0 to recipient.
+        - [ ] `test_cancel_after_end` — full vested to recipient, 0 refund.
+        - [ ] `test_claim_after_cancel_panics` — stream is_cancelled guard.
+
+        CI:
+        - [ ] `cargo test` passes with RUSTFLAGS="-D warnings".
+        - [ ] `cargo clippy --target wasm32-unknown-unknown -- -D warnings` clean.
+        - [ ] `stellar contract build --profile release` succeeds.
+        - [ ] CI is green.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: Explicit boundaries to prevent scope creep.
+      placeholder: |
+        - Non-linear vesting curves (separate issue)
+        - Frontend cancel UI (separate medium issue, blocked on this)
+
+  - type: dropdown
+    id: design_review_status
+    attributes:
+      label: Design Review Status
+      description: |
+        Has a core maintainer acknowledged this issue and approved the approach?
+      options:
+        - "Not yet reviewed — please review before I start implementation"
+        - "In discussion — see comments below"
+        - "Approved — maintainer @HANDLE approved on DATE"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: security_checklist
+    attributes:
+      label: Security Checklist (required for all High issues)
+      options:
+        - label: I have described the threat model / attack scenarios above
+          required: true
+        - label: The proposed implementation follows Checks-Effects-Interactions
+          required: true
+        - label: All new test cases cover at least one negative/attack path
+          required: true
+        - label: I will request a maintainer security review before merging
+          required: true
+        - label: This change has been discussed in an issue or design doc before coding started
+          required: true

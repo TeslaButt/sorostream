@@ -1,0 +1,7 @@
+[toolchain]
+# Pinned to the minimum version required by the Soroban SDK v21 dependency tree.
+# Bump this version together with soroban-sdk upgrades.
+# See: https://developers.stellar.org/docs/smart-contracts/getting-started/setup
+channel  = "1.88.0"
+targets  = ["wasm32-unknown-unknown"]
+components = ["clippy", "rustfmt"]

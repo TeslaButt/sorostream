@@ -1,0 +1,127 @@
+name: "🟡 Medium — Frontend Components & Contract Math"
+description: |
+  Use this template for features or fixes that require understanding the
+  SoroStream data model and involve either frontend React components or
+  moderately complex contract arithmetic.
+
+  DRIPS COMPLEXITY TIER: Medium
+  Suitable for: Developers familiar with TypeScript/React or Rust basics.
+  Reward range: $200 – $600 (see CONTRIBUTING.md for reward policy).
+
+labels:
+  - "complexity: medium"
+  - "help wanted"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🟡 Medium Issue — SoroStream
+
+        Medium issues require a working understanding of the SoroStream
+        architecture. They involve non-trivial TypeScript or Rust changes but
+        do **not** touch security-critical paths.
+
+        **Before opening:** read the [Architecture Overview](../../packages/contracts/src/lib.rs)
+        and the [CONTRIBUTING.md](../../CONTRIBUTING.md).
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      description: Which part of the codebase does this touch?
+      multiple: true
+      options:
+        - "packages/contracts — contract arithmetic / new entrypoint"
+        - "packages/frontend — React component / page"
+        - "packages/frontend — Soroban client integration"
+        - "packages/frontend — Wallet / Freighter flow"
+        - "CI / tooling"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Statement
+      description: |
+        Describe the problem or missing feature in full. Include:
+        - What currently happens (or doesn't happen)
+        - What the expected behaviour is
+        - Any relevant context (links to Soroban docs, SDF forum posts, etc.)
+      placeholder: |
+        Example: "There is currently no UI component showing live streaming
+        progress. Users have no visual feedback on how much of a stream they
+        can claim at the current moment.
+
+        Expected: A `<StreamCard />` component that calls `claimable_amount()`
+        via `simulateTransaction` every 10 seconds and displays a progress bar."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution / Approach
+      description: |
+        Optional but encouraged. How do you think this should be implemented?
+        This speeds up review and helps prevent wasted effort on wrong approaches.
+      placeholder: |
+        - Add a `useClaimableAmount(streamId)` React hook in `hooks/useStream.ts`
+          that calls `simulateTransaction` on the contract's `claimable_amount` function.
+        - Create `components/StreamCard.tsx` consuming that hook.
+        - Use a CSS `progress` element with a periodic `setInterval` refresh.
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Specific, checkable conditions for completion.
+      placeholder: |
+        - [ ] `useClaimableAmount(streamId)` hook implemented and exported.
+        - [ ] `StreamCard` displays percentage vested and token amount claimable.
+        - [ ] Component auto-refreshes every 10 seconds without memory leaks.
+        - [ ] `npm run lint` passes.
+        - [ ] `cargo test` still passes (no contract changes required, but verify).
+        - [ ] CI is green.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: |
+        Explicitly list what this issue does NOT cover, to set clear boundaries.
+      placeholder: |
+        - Non-linear vesting curves (separate high-complexity issue)
+        - Mobile responsive layout (separate medium issue)
+
+  - type: checkboxes
+    id: security_impact
+    attributes:
+      label: Security Impact
+      description: |
+        Does this issue touch financial or security-critical logic?
+        (If yes, consider filing a High-complexity issue instead.)
+      options:
+        - label: This change modifies token transfer logic
+        - label: This change modifies authorization / access control
+        - label: This change could affect on-chain state directly
+
+  - type: checkboxes
+    id: pr_checklist
+    attributes:
+      label: Contributor Pre-flight Checklist
+      options:
+        - label: I have read CONTRIBUTING.md
+          required: true
+        - label: I have searched for duplicate issues
+          required: true
+        - label: "`cargo test` passes locally (if contracts are modified)"
+          required: false
+        - label: "`npm run lint` and `npm run build` pass locally"
+          required: false
+        - label: CI is green on my branch
+          required: false

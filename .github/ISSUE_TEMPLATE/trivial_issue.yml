@@ -1,0 +1,84 @@
+name: "🟢 Trivial — Docs, Typos & Config"
+description: |
+  Use this template for small, well-defined tasks that don't require understanding
+  the Soroban contract or complex TypeScript logic.
+
+  DRIPS COMPLEXITY TIER: Trivial
+  Suitable for: First-time contributors, documentation writers, students.
+  Reward range: $25 – $100 (see CONTRIBUTING.md for reward policy).
+
+labels:
+  - "complexity: trivial"
+  - "good first issue"
+  - "help wanted"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🟢 Trivial Issue — SoroStream
+
+        Trivial issues are ideal for **first-time contributors**. They have
+        narrowly-scoped requirements and don't touch financial or security logic.
+
+        **Before opening:** check the [open issues](../../issues) to avoid duplicates.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What kind of trivial change is this?
+      options:
+        - "Documentation (README, CONTRIBUTING, code comments)"
+        - "Typo or grammar fix"
+        - "Config / tooling (ESLint, Prettier, tsconfig)"
+        - "Dependency bump (non-breaking)"
+        - "Test helper or fixture"
+        - "Other (describe below)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to change?
+      description: |
+        Be specific. Include file paths, line numbers, or screenshots where helpful.
+        A reviewer should be able to implement this without asking follow-up questions.
+      placeholder: |
+        Example: "The `get_stream` function in packages/contracts/src/lib.rs
+        is missing a `# Returns` section in its doc comment. It should describe
+        that it returns a `Stream` struct and panics if the stream ID doesn't exist."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        List the specific, checkable conditions that must be true for this issue
+        to be considered complete.
+      placeholder: |
+        - [ ] `get_stream` doc comment includes a `# Returns` section.
+        - [ ] `get_stream` doc comment includes a `# Panics` section.
+        - [ ] `cargo fmt --check` passes.
+        - [ ] CI is green.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: pr_checklist
+    attributes:
+      label: Contributor Pre-flight Checklist
+      description: |
+        Check these before opening your PR (see CONTRIBUTING.md).
+      options:
+        - label: I have read CONTRIBUTING.md
+          required: true
+        - label: I have searched for duplicate issues
+          required: true
+        - label: My change is narrowly scoped (one concern per PR)
+          required: true
+        - label: CI is green on my branch
+          required: false
