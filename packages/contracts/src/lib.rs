@@ -31,9 +31,7 @@
 //!   - `[medium]`   — maths, new entrypoints, frontend integration
 //!   - `[high]`     — security-critical paths, edge-case hardening
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, token, Address, Env,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Codes
@@ -51,13 +49,13 @@ use soroban_sdk::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SoroError {
     AlreadyInitialized = 1,
-    NotInitialized     = 2,
-    StreamNotFound     = 3,
-    Unauthorized       = 4,
-    InvalidAmount      = 5,
-    InvalidTimeRange   = 6,
-    NothingToClaim     = 7,
-    StreamEnded        = 8,
+    NotInitialized = 2,
+    StreamNotFound = 3,
+    Unauthorized = 4,
+    InvalidAmount = 5,
+    InvalidTimeRange = 6,
+    NothingToClaim = 7,
+    StreamEnded = 8,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +142,9 @@ impl SoroStream {
 
         env.storage().persistent().set(&DataKey::Init, &true);
         env.storage().persistent().set(&DataKey::Admin, &admin);
-        env.storage().persistent().set(&DataKey::NextStreamId, &0_u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::NextStreamId, &0_u64);
 
         env.events()
             .publish((symbol_short!("protocol"), symbol_short!("init")), admin);
@@ -246,7 +246,9 @@ impl SoroStream {
 
         env.events().publish(
             (symbol_short!("stream"), symbol_short!("created")),
-            (stream_id, sender, recipient, token, amount, start_time, end_time),
+            (
+                stream_id, sender, recipient, token, amount, start_time, end_time,
+            ),
         );
 
         stream_id
@@ -374,13 +376,21 @@ impl SoroStream {
             .set(&DataKey::Stream(stream_id), &stream);
 
         let token_client = token::Client::new(&env, &stream.token);
-        
+
         if recipient_claimable > 0 {
-            token_client.transfer(&env.current_contract_address(), &stream.recipient, &recipient_claimable);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &stream.recipient,
+                &recipient_claimable,
+            );
         }
-        
+
         if sender_refund > 0 {
-            token_client.transfer(&env.current_contract_address(), &stream.sender, &sender_refund);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &stream.sender,
+                &sender_refund,
+            );
         }
 
         env.events().publish(
@@ -499,7 +509,9 @@ mod tests {
 
     #[test]
     fn test_initialize_only_once() {
-        let Setup { env, client, admin, .. } = setup();
+        let Setup {
+            env, client, admin, ..
+        } = setup();
         let extra_admin = Address::generate(&env);
         let result = client.try_initialize(&extra_admin);
         assert!(result.is_err(), "second initialize should fail");
@@ -652,12 +664,26 @@ mod tests {
         } = setup();
 
         env.ledger().with_mut(|l| l.timestamp = 1_000);
-        client.create_stream(&sender, &recipient, &token.address, &0_i128, &2_000_u64, &5_000_u64);
+        client.create_stream(
+            &sender,
+            &recipient,
+            &token.address,
+            &0_i128,
+            &2_000_u64,
+            &5_000_u64,
+        );
     }
 
     #[test]
     fn test_cancel_at_50pct() {
-        let Setup { env, client, token, sender, recipient, .. } = setup();
+        let Setup {
+            env,
+            client,
+            token,
+            sender,
+            recipient,
+            ..
+        } = setup();
 
         env.ledger().with_mut(|l| l.timestamp = 1_000);
         let start = 1_000_u64;
@@ -665,15 +691,30 @@ mod tests {
 
         let token_client = token::Client::new(&env, &token.address);
 
-        let stream_id = client.create_stream(&sender, &recipient, &token.address, &100_000_000_i128, &start, &end);
+        let stream_id = client.create_stream(
+            &sender,
+            &recipient,
+            &token.address,
+            &100_000_000_i128,
+            &start,
+            &end,
+        );
 
         // Wind forward to halfway
         env.ledger().with_mut(|l| l.timestamp = 6_000);
 
         client.cancel_stream(&stream_id, &sender);
 
-        assert_eq!(token_client.balance(&recipient), 50_000_000, "50% to recipient");
-        assert_eq!(token_client.balance(&sender), 950_000_000, "50% refunded to sender (900M + 50M)");
+        assert_eq!(
+            token_client.balance(&recipient),
+            50_000_000,
+            "50% to recipient"
+        );
+        assert_eq!(
+            token_client.balance(&sender),
+            950_000_000,
+            "50% refunded to sender (900M + 50M)"
+        );
 
         let stream = client.get_stream(&stream_id);
         assert!(stream.is_cancelled);
@@ -682,50 +723,100 @@ mod tests {
 
     #[test]
     fn test_cancel_before_start() {
-        let Setup { env, client, token, sender, recipient, .. } = setup();
+        let Setup {
+            env,
+            client,
+            token,
+            sender,
+            recipient,
+            ..
+        } = setup();
 
         env.ledger().with_mut(|l| l.timestamp = 1_000);
         let start = 5_000_u64;
         let end = 15_000_u64;
 
         let token_client = token::Client::new(&env, &token.address);
-        let stream_id = client.create_stream(&sender, &recipient, &token.address, &100_000_000_i128, &start, &end);
+        let stream_id = client.create_stream(
+            &sender,
+            &recipient,
+            &token.address,
+            &100_000_000_i128,
+            &start,
+            &end,
+        );
 
         env.ledger().with_mut(|l| l.timestamp = 2_000);
         client.cancel_stream(&stream_id, &sender);
 
         assert_eq!(token_client.balance(&recipient), 0);
-        assert_eq!(token_client.balance(&sender), 1_000_000_000, "100% refunded");
+        assert_eq!(
+            token_client.balance(&sender),
+            1_000_000_000,
+            "100% refunded"
+        );
     }
 
     #[test]
     fn test_cancel_after_end() {
-        let Setup { env, client, token, sender, recipient, .. } = setup();
+        let Setup {
+            env,
+            client,
+            token,
+            sender,
+            recipient,
+            ..
+        } = setup();
 
         env.ledger().with_mut(|l| l.timestamp = 1_000);
         let start = 1_000_u64;
         let end = 11_000_u64;
 
         let token_client = token::Client::new(&env, &token.address);
-        let stream_id = client.create_stream(&sender, &recipient, &token.address, &100_000_000_i128, &start, &end);
+        let stream_id = client.create_stream(
+            &sender,
+            &recipient,
+            &token.address,
+            &100_000_000_i128,
+            &start,
+            &end,
+        );
 
         env.ledger().with_mut(|l| l.timestamp = 20_000);
         client.cancel_stream(&stream_id, &sender);
 
-        assert_eq!(token_client.balance(&recipient), 100_000_000, "100% claimable");
+        assert_eq!(
+            token_client.balance(&recipient),
+            100_000_000,
+            "100% claimable"
+        );
         assert_eq!(token_client.balance(&sender), 900_000_000, "0 refund");
     }
 
     #[test]
     #[should_panic(expected = "stream has been cancelled")]
     fn test_claim_after_cancel_panics() {
-        let Setup { env, client, token, sender, recipient, .. } = setup();
+        let Setup {
+            env,
+            client,
+            token,
+            sender,
+            recipient,
+            ..
+        } = setup();
 
         env.ledger().with_mut(|l| l.timestamp = 1_000);
         let start = 1_000_u64;
         let end = 11_000_u64;
 
-        let stream_id = client.create_stream(&sender, &recipient, &token.address, &100_000_000_i128, &start, &end);
+        let stream_id = client.create_stream(
+            &sender,
+            &recipient,
+            &token.address,
+            &100_000_000_i128,
+            &start,
+            &end,
+        );
 
         env.ledger().with_mut(|l| l.timestamp = 6_000);
         client.cancel_stream(&stream_id, &sender);
